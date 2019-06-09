@@ -1,5 +1,5 @@
 let constants = {}
-constants.organization = 'poanetwork'
+constants.organization = 'tendanetwork'
 constants.repoName = 'poa-chain-spec'
 constants.addressesSourceFile = 'contracts.json'
 constants.ABIsSources = {
@@ -51,12 +51,22 @@ constants.navigationData = [
   }
 ]
 
-constants.SOKOL = 'sokol'
-constants.CORE = 'core'
-constants.DAI = 'dai'
-constants.KOVAN = 'kovan'
+//constants.SOKOL = 'sokol'
+//constants.CORE = 'core'
+//constants.DAI = 'dai'
+//constants.KOVAN = 'kovan'
+constants.TENDA = 'tenda'
 
 constants.NETWORKS = {
+  '177': {
+    NAME: 'Tenda',
+    RPC: 'https://rpc.tenda.network',
+    BRANCH: 'tenda',
+    TESTNET: false
+  }
+}
+
+/* constants.NETWORKS = {
   '42': {
     NAME: 'Kovan',
     RPC: 'https://kovan.infura.io/v3/1125fe73d87c4e5396678f4e3089b3dd',
@@ -82,7 +92,7 @@ constants.NETWORKS = {
     TESTNET: false
   }
 }
-
+*/
 module.exports = {
   constants
 }
