@@ -61,7 +61,7 @@ constants.NETWORKS = {
   '177': {
     NAME: 'Tenda',
     RPC: 'https://rpc.tenda.network',
-    BRANCH: 'tenda',
+    BRANCH: constants.TENDA,
     TESTNET: false
   }
 }
