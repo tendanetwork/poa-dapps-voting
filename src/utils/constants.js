@@ -55,11 +55,11 @@ constants.navigationData = [
 //constants.CORE = 'core'
 //constants.DAI = 'dai'
 //constants.KOVAN = 'kovan'
-constants.TENDA = 'tenda'
+constants.TENDA = 'tenda-dev'
 
 constants.NETWORKS = {
   '177': {
-    NAME: 'Tenda',
+    NAME: 'Tenda-dev',
     RPC: 'https://rpc.dev.tenda.network',
     BRANCH: 'tenda-dev',
     TESTNET: true
