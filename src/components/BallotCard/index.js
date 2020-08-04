@@ -7,9 +7,10 @@ import { BallotInfoContainer } from '../BallotInfoContainer'
 import { Votes } from '../Votes'
 import { getNetworkBranch } from '../../utils/utils'
 import { inject, observer } from 'mobx-react'
-import { messages } from '../../utils/messages'
+import messages from '../../utils/messages'
 import { observable, action, computed } from 'mobx'
 import { sendTransactionByVotingKey } from '../../utils/helpers'
+import { enableWallet } from '../../utils/getWeb3'
 
 const ACCEPT = 1
 const REJECT = 2
@@ -59,6 +60,7 @@ export class BallotCard extends React.Component {
   @observable memo
   @observable quorumState
   @observable minBallotDuration
+  @observable minThreshold
 
   @computed
   get cancelOrFinalizeButtonDisplayName() {
@@ -302,6 +304,9 @@ export class BallotCard extends React.Component {
       this.getHasAlreadyVoted()
     }
 
+    // minThreshold
+    this.getMinThreshold()
+
     if (votingType === 'votingToManageEmissionFunds') {
       this.getQuorumState()
     }
@@ -317,9 +322,19 @@ export class BallotCard extends React.Component {
     return formattedMs
   }
 
+  @action('ballot min threshold of voters')
+  getMinThreshold = async () => {
+    const { contractsStore, id, votingType } = this.props
+    this.minThreshold = await this.getContract(contractsStore, votingType).getMinThresholdOfVoters(id)
+  }
+
   @action('validator has already voted')
   getHasAlreadyVoted = async () => {
     const { contractsStore, id, votingType } = this.props
+    if (contractsStore.miningKey === '0x0000000000000000000000000000000000000000') {
+      this.hasAlreadyVoted = false
+      return
+    }
     let _hasAlreadyVoted = false
     try {
       _hasAlreadyVoted = await this.getContract(contractsStore, votingType).hasAlreadyVoted(
@@ -360,6 +375,27 @@ export class BallotCard extends React.Component {
     this.quorumState = await this.repeatGetProperty(contractsStore, votingType, id, 'getQuorumState', 0)
   }
 
+  networkAndKeyValidation = async () => {
+    const { contractsStore } = this.props
+    try {
+      await enableWallet(contractsStore.updateKeys)
+    } catch (error) {
+      swal('Error', error.message, 'error')
+      return false
+    }
+    if (contractsStore.isEmptyVotingKey) {
+      swal('Warning!', messages.NO_METAMASK_MSG, 'warning')
+      return false
+    } else if (!contractsStore.networkMatch) {
+      swal('Warning!', messages.networkMatchError(contractsStore.netId), 'warning')
+      return false
+    } else if (!contractsStore.isValidVotingKey) {
+      swal('Warning!', messages.invalidVotingKeyMsg(contractsStore.votingKey), 'warning')
+      return false
+    }
+    return true
+  }
+
   vote = async ({ choice }) => {
     if (this.isCanceled) {
       swal('Warning!', messages.INVALID_VOTE_MSG, 'warning')
@@ -369,15 +405,13 @@ export class BallotCard extends React.Component {
       swal('Warning!', messages.ballotIsNotActiveMsg(this.timeTo.displayValue), 'warning')
       return
     }
-    const { commonStore, contractsStore, id, votingType, ballotsStore, pos } = this.props
-    const { push } = this.props.routing
-    if (!contractsStore.votingKey) {
-      swal('Warning!', messages.NO_METAMASK_MSG, 'warning')
-      return
-    } else if (!contractsStore.isValidVotingKey) {
-      swal('Warning!', messages.invalidVotingKeyMsg(contractsStore.votingKey), 'warning')
+
+    if (!(await this.networkAndKeyValidation())) {
       return
     }
+
+    const { commonStore, contractsStore, id, votingType, ballotsStore, pos } = this.props
+    const { push } = this.props.routing
     commonStore.showLoading()
     let isValidVote = await this.isValidVote()
     if (!isValidVote) {
@@ -456,6 +490,11 @@ export class BallotCard extends React.Component {
     const { votingState, contractsStore, commonStore, ballotsStore, votingType, id, pos } = this.props
     const { push } = this.props.routing
     const contract = this.getContract(contractsStore, votingType)
+
+    if (!(await this.networkAndKeyValidation())) {
+      return
+    }
+
     let canCancel = true
 
     if (!this.timeToCancel.val) {
@@ -508,13 +547,11 @@ export class BallotCard extends React.Component {
     }
     const { commonStore, contractsStore, id, votingType, ballotsStore, pos } = this.props
     const { push } = this.props.routing
-    if (!contractsStore.votingKey) {
-      swal('Warning!', messages.NO_METAMASK_MSG, 'warning')
-      return
-    } else if (!contractsStore.isValidVotingKey) {
-      swal('Warning!', messages.invalidVotingKeyMsg(contractsStore.votingKey), 'warning')
+
+    if (!(await this.networkAndKeyValidation())) {
       return
     }
+
     if (this.isFinalized) {
       swal('Warning!', messages.ALREADY_FINALIZED_MSG, 'warning')
       return
@@ -600,21 +637,6 @@ export class BallotCard extends React.Component {
     }
   }
 
-  getThreshold(contractsStore, votingType) {
-    switch (votingType) {
-      case 'votingToChangeKeys':
-        return contractsStore.keysBallotThreshold
-      case 'votingToChangeMinThreshold':
-        return contractsStore.minThresholdBallotThreshold
-      case 'votingToChangeProxy':
-        return contractsStore.proxyBallotThreshold
-      case 'votingToManageEmissionFunds':
-        return contractsStore.emissionFundsBallotThreshold
-      default:
-        return contractsStore.keysBallotThreshold
-    }
-  }
-
   getMinBallotDuration(contractsStore, votingType) {
     switch (votingType) {
       case 'votingToChangeKeys':
@@ -672,10 +694,9 @@ export class BallotCard extends React.Component {
   }
 
   render() {
-    let { contractsStore, votingType, children } = this.props
+    let { votingType, children } = this.props
     let votes
 
-    const threshold = this.getThreshold(contractsStore, votingType)
     const networkBranch = this.getVotingNetworkBranch()
 
     if (votingType === 'votingToManageEmissionFunds') {
@@ -734,12 +755,7 @@ export class BallotCard extends React.Component {
           />
         </div>
         <Votes networkBranch={networkBranch} votes={votes} />
-        <BallotInfoContainer
-          memo={this.memo}
-          networkBranch={networkBranch}
-          threshold={threshold}
-          validatorsLength={contractsStore.validatorsLength}
-        />
+        <BallotInfoContainer memo={this.memo} networkBranch={networkBranch} threshold={this.minThreshold} />
         <BallotFooter
           buttonState={this.cancelOrFinalizeButtonState}
           buttonText={this.cancelOrFinalizeButtonDisplayName}

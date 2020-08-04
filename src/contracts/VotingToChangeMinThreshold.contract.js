@@ -54,6 +54,10 @@ export default class VotingToChangeMinThreshold {
     return this.instance.methods.votingState(_id).call()
   }
 
+  getMinThresholdOfVoters(_id) {
+    return this.instance.methods.getMinThresholdOfVoters(_id).call()
+  }
+
   hasAlreadyVoted(_id, votingKey) {
     return this.instance.methods.hasAlreadyVoted(_id, votingKey).call()
   }
@@ -78,7 +82,7 @@ export default class VotingToChangeMinThreshold {
     return _limitPerValidator - _activeBallots
   }
 
-  async minBallotDuration() {
-    return await this.instance.methods.minBallotDuration().call()
+  minBallotDuration() {
+    return this.instance.methods.minBallotDuration().call()
   }
 }
