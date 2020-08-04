@@ -5,7 +5,8 @@ import { Route, Redirect } from 'react-router-dom'
 import { constants } from './utils/constants'
 import { getNetworkBranch } from './utils/utils'
 import { inject, observer } from 'mobx-react'
-import { messages } from './utils/messages'
+import messages from './utils/messages'
+import { enableWallet } from './utils/getWeb3'
 
 import './assets/stylesheets/index.css'
 
@@ -41,16 +42,32 @@ class App extends Component {
   onNewBallotRender = () => {
     const { commonStore, contractsStore } = this.props
 
-    if (!contractsStore.web3Instance) {
-      if (!commonStore.loading) {
-        swal({
-          title: 'Error',
-          html: messages.NO_METAMASK_MSG,
-          icon: 'error',
-          type: 'error'
+    if (!commonStore.loading) {
+      enableWallet(contractsStore.updateKeys)
+        .then(() => {
+          if (!contractsStore.injectedWeb3) {
+            swal({
+              title: 'Error',
+              html: messages.NO_METAMASK_MSG,
+              type: 'error'
+            })
+          } else if (!contractsStore.networkMatch) {
+            swal({
+              title: 'Warning!',
+              html: messages.networkMatchError(contractsStore.netId),
+              type: 'warning'
+            })
+          } else if (!contractsStore.isValidVotingKey) {
+            swal({
+              title: 'Warning!',
+              html: messages.invalidVotingKeyMsg(contractsStore.votingKey),
+              type: 'warning'
+            })
+          }
         })
-      }
-      return null
+        .catch(error => {
+          swal('Error', error.message, 'error')
+        })
     }
     return <NewBallot networkBranch={this.getVotingNetworkBranch()} />
   }
@@ -60,8 +77,7 @@ class App extends Component {
   }
 
   onSearch = e => {
-    const { commonStore } = this.props
-    commonStore.setSearchTerm(e.target.value.toLowerCase())
+    this.setSearchTerm(e.target.value)
   }
 
   hideSearch = () => {
@@ -85,13 +101,28 @@ class App extends Component {
     return 'All'
   }
 
+  setSearchTerm = term => {
+    const { commonStore } = this.props
+    commonStore.setSearchTerm(term.toLowerCase())
+    if (this.refs.searchBar) {
+      this.refs.searchBar.setSearchTerm(term)
+    }
+  }
+
+  onNetworkChange = e => {
+    this.setSearchTerm('')
+    this.props.onNetworkChange(e)
+  }
+
   isNewBallotPage() {
     return `${constants.rootPath}/new` === this.props.location.pathname
   }
 
   render() {
     const { commonStore, contractsStore } = this.props
-    const networkBranch = this.getVotingNetworkBranch()
+    const networkBranch = commonStore.loadingNetworkBranch
+      ? commonStore.loadingNetworkBranch
+      : this.getVotingNetworkBranch()
 
     return networkBranch ? (
       <div
@@ -104,10 +135,18 @@ class App extends Component {
           baseRootPath={commonStore.rootPath}
           netId={contractsStore.netId}
           networkBranch={networkBranch}
+          onChange={this.onNetworkChange}
           onMenuToggle={this.toggleMobileMenu}
           showMobileMenu={this.state.showMobileMenu}
         />
-        {this.hideSearch() ? null : <SearchBar networkBranch={networkBranch} onSearch={this.onSearch} />}
+        {this.hideSearch() ? null : (
+          <SearchBar
+            networkBranch={networkBranch}
+            onSearch={this.onSearch}
+            searchTerm={commonStore.searchTerm}
+            ref="searchBar"
+          />
+        )}
         <MainTitle text={this.getTitle()} />
         <section
           className={`lo-App_Content lo-App_Content-${networkBranch} ${
